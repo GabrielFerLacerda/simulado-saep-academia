@@ -1,4 +1,4 @@
-// App.jsx — SPA mínima "meia meia meia" (React + axios)
+// App.jsx — SPA mínima adaptada para Ferramentas (React + axios)
 // Entregas: 4 (login), 5 (principal), 6 (cadastro produto), 7 (gestão de estoque)
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
@@ -61,7 +61,18 @@ export default function App() {
   const [q, setQ] = useState(""); // busca
 
   // form produto
-  const emptyProduto = { id: null, nome: "", quantidade: 0, estoque_minimo: 0 };
+  const emptyProduto = {
+    id: null,
+    nome: "",
+    marca: "",
+    modelo: "",
+    tipo_material: "",
+    tamanho: "",
+    peso: "",
+    tensao_eletrica: "",
+    quantidade: 0,
+    estoque_minimo: 0,
+  };
   const [produtoForm, setProdutoForm] = useState(emptyProduto);
   const [editandoId, setEditandoId] = useState(null);
 
@@ -84,7 +95,6 @@ export default function App() {
   }, [view]);
 
   const produtosOrdenados = useMemo(() => {
-    // 7.1.1 — ordem alfabética no FRONT (não confiar na ordenação do backend)
     return [...produtos].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
   }, [produtos]);
 
@@ -94,12 +104,13 @@ export default function App() {
   };
 
   const validarProdutoForm = () => {
-    const { nome, quantidade, estoque_minimo } = produtoForm;
+    const { nome, marca, modelo, quantidade, estoque_minimo } = produtoForm;
     if (!notEmpty(nome)) return "Informe o nome do produto.";
+    if (!notEmpty(marca)) return "Informe a marca.";
+    if (!notEmpty(modelo)) return "Informe o modelo.";
     if (toInt(quantidade) < 0) return "Quantidade não pode ser negativa.";
     if (toInt(estoque_minimo) < 0) return "Estoque mínimo não pode ser negativo.";
     return null;
-    // 6.1.6 — validações mínimas
   };
 
   const criarProduto = async () => {
@@ -108,6 +119,12 @@ export default function App() {
     try {
       await API.post("/produtos", {
         nome: produtoForm.nome.trim(),
+        marca: produtoForm.marca.trim(),
+        modelo: produtoForm.modelo.trim(),
+        tipo_material: produtoForm.tipo_material?.trim() || null,
+        tamanho: produtoForm.tamanho?.trim() || null,
+        peso: produtoForm.peso?.trim() || null,
+        tensao_eletrica: produtoForm.tensao_eletrica?.trim() || null,
         quantidade: toInt(produtoForm.quantidade),
         estoque_minimo: toInt(produtoForm.estoque_minimo),
       });
@@ -123,6 +140,12 @@ export default function App() {
     setProdutoForm({
       id: p.id,
       nome: p.nome,
+      marca: p.marca,
+      modelo: p.modelo,
+      tipo_material: p.tipo_material || "",
+      tamanho: p.tamanho || "",
+      peso: p.peso || "",
+      tensao_eletrica: p.tensao_eletrica || "",
       quantidade: p.quantidade,
       estoque_minimo: p.estoque_minimo,
     });
@@ -135,6 +158,12 @@ export default function App() {
     try {
       await API.put(`/produtos/${editandoId}`, {
         nome: produtoForm.nome.trim(),
+        marca: produtoForm.marca.trim(),
+        modelo: produtoForm.modelo.trim(),
+        tipo_material: produtoForm.tipo_material?.trim() || null,
+        tamanho: produtoForm.tamanho?.trim() || null,
+        peso: produtoForm.peso?.trim() || null,
+        tensao_eletrica: produtoForm.tensao_eletrica?.trim() || null,
         quantidade: toInt(produtoForm.quantidade),
         estoque_minimo: toInt(produtoForm.estoque_minimo),
       });
@@ -150,7 +179,6 @@ export default function App() {
     try {
       await API.delete(`/produtos/${id}`);
       await carregarProdutos();
-      // 6.1.5 — excluir
     } catch (e) {
       alert(e?.response?.data?.error || "Erro ao excluir produto");
     }
@@ -159,7 +187,6 @@ export default function App() {
   const buscar = async (e) => {
     e?.preventDefault();
     await carregarProdutos(q);
-    // 6.1.2 — busca atualiza a listagem
   };
 
   // -------------------------------
@@ -184,21 +211,17 @@ export default function App() {
         usuario_id: user.id,
         tipo: movTipo,
         quantidade: qtd,
-        data_movimentacao: notEmpty(movData) ? new Date(movData).toISOString() : null, // 7.1.3
+        data_movimentacao: notEmpty(movData) ? new Date(movData).toISOString() : null,
         observacao: notEmpty(movObs) ? movObs.trim() : null,
       };
       const { data } = await API.post("/movimentacoes", payload);
-      // data.produto.abaxo_do_minimo (do backend)
       alert("Movimentação registrada com sucesso.");
       if (data?.produto?.abaixo_do_minimo) {
         alert("⚠️ Estoque abaixo do mínimo para este produto!");
       }
-      // atualizar listagem para refletir novo saldo
       await carregarProdutos();
-      // limpar form
       setMovQuantidade("");
       setMovObs("");
-      // manter produto/tipo/data para facilitar uso contínuo
     } catch (e) {
       alert(e?.response?.data?.error || "Erro ao registrar movimentação");
     }
@@ -209,7 +232,7 @@ export default function App() {
   // -------------------------------
   return (
     <div className="app-container">
-      <h1>Gestão de Estoque Academia</h1>
+      <h1>Gestão de Ferramentas / Estoque</h1>
 
       {/* LOGIN (4) */}
       {view === "login" && (
@@ -244,7 +267,7 @@ export default function App() {
         <section className="form" aria-label="home">
           <h2>Olá, {user?.nome}</h2>
           <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={() => setView("produtos")}>Cadastro de Produto</button>
+            <button onClick={() => setView("produtos")}>Cadastro de Ferramenta</button>
             <button onClick={() => setView("estoque")}>Gestão de Estoque</button>
             <button onClick={logout}>Sair</button>
           </div>
@@ -254,13 +277,13 @@ export default function App() {
       {/* CADASTRO DE PRODUTO (6) */}
       {view === "produtos" && (
         <section className="form" aria-label="produtos">
-          <h2>Cadastro de Produto</h2>
+          <h2>Cadastro de Ferramenta</h2>
 
-          {/* busca (6.1.2) */}
+          {/* busca */}
           <form onSubmit={buscar} style={{ width: "100%", display: "flex", gap: 8 }}>
             <input
               type="text"
-              placeholder="Buscar por nome (ex.: arrastão)"
+              placeholder="Buscar por nome (ex.: furadeira)"
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
@@ -270,7 +293,7 @@ export default function App() {
             </button>
           </form>
 
-          {/* form criar/editar (6.1.3–6.1.4–6.1.6) */}
+          {/* form criar/editar */}
           <div style={{ width: "100%", display: "grid", gap: 8 }}>
             <div className="input-container">
               <label>Nome</label>
@@ -278,8 +301,64 @@ export default function App() {
                 type="text"
                 value={produtoForm.nome}
                 onChange={(e) => setProdutoForm((s) => ({ ...s, nome: e.target.value }))}
-                placeholder='ex.: "Halter 5kg"'
+                placeholder='ex.: "Furadeira Bosch"'
                 required
+              />
+            </div>
+            <div className="input-container">
+              <label>Marca</label>
+              <input
+                type="text"
+                value={produtoForm.marca}
+                onChange={(e) => setProdutoForm((s) => ({ ...s, marca: e.target.value }))}
+                placeholder='ex.: "Bosch"'
+                required
+              />
+            </div>
+            <div className="input-container">
+              <label>Modelo</label>
+              <input
+                type="text"
+                value={produtoForm.modelo}
+                onChange={(e) => setProdutoForm((s) => ({ ...s, modelo: e.target.value }))}
+                placeholder='ex.: "GSR 1000"'
+                required
+              />
+            </div>
+            <div className="input-container">
+              <label>Tipo de Material</label>
+              <input
+                type="text"
+                value={produtoForm.tipo_material}
+                onChange={(e) => setProdutoForm((s) => ({ ...s, tipo_material: e.target.value }))}
+                placeholder='ex.: "Aço"'
+              />
+            </div>
+            <div className="input-container">
+              <label>Tamanho</label>
+              <input
+                type="text"
+                value={produtoForm.tamanho}
+                onChange={(e) => setProdutoForm((s) => ({ ...s, tamanho: e.target.value }))}
+                placeholder='ex.: "Médio"'
+              />
+            </div>
+            <div className="input-container">
+              <label>Peso</label>
+              <input
+                type="text"
+                value={produtoForm.peso}
+                onChange={(e) => setProdutoForm((s) => ({ ...s, peso: e.target.value }))}
+                placeholder='ex.: "1.5kg"'
+              />
+            </div>
+            <div className="input-container">
+              <label>Tensão Elétrica</label>
+              <input
+                type="text"
+                value={produtoForm.tensao_eletrica}
+                onChange={(e) => setProdutoForm((s) => ({ ...s, tensao_eletrica: e.target.value }))}
+                placeholder='ex.: "220V"'
               />
             </div>
             <div className="input-container">
@@ -300,7 +379,6 @@ export default function App() {
                 min={0}
               />
             </div>
-
             <div style={{ display: "flex", gap: 8 }}>
               {editandoId ? (
                 <>
@@ -308,20 +386,26 @@ export default function App() {
                   <button type="button" onClick={limparProdutoForm}>Cancelar</button>
                 </>
               ) : (
-                <button type="button" onClick={criarProduto}>Cadastrar produto</button>
+                <button type="button" onClick={criarProduto}>Cadastrar ferramenta</button>
               )}
               <button type="button" onClick={() => setView("home")}>Voltar</button>
             </div>
           </div>
 
-          {/* listagem (6.1.1) — em tabela; (6.1.5) excluir; editar */}
+          {/* listagem */}
           <div style={{ width: "100%", marginTop: 10 }}>
             {loadingProdutos && <p>Carregando...</p>}
             {!loadingProdutos && (
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr>
-                    <th style={{ textAlign: "left" }}>Nome</th>
+                    <th>Nome</th>
+                    <th>Marca</th>
+                    <th>Modelo</th>
+                    <th>Tipo</th>
+                    <th>Tamanho</th>
+                    <th>Peso</th>
+                    <th>Tensão</th>
                     <th>Qtd</th>
                     <th>Mín</th>
                     <th>Alerta</th>
@@ -332,6 +416,12 @@ export default function App() {
                   {produtosOrdenados.map((p) => (
                     <tr key={p.id}>
                       <td>{p.nome}</td>
+                      <td>{p.marca}</td>
+                      <td>{p.modelo}</td>
+                      <td>{p.tipo_material}</td>
+                      <td>{p.tamanho}</td>
+                      <td>{p.peso}</td>
+                      <td>{p.tensao_eletrica}</td>
                       <td style={{ textAlign: "center" }}>{p.quantidade}</td>
                       <td style={{ textAlign: "center" }}>{p.estoque_minimo}</td>
                       <td style={{ textAlign: "center" }}>
@@ -344,7 +434,7 @@ export default function App() {
                     </tr>
                   ))}
                   {produtosOrdenados.length === 0 && (
-                    <tr><td colSpan={5}>Nenhum produto.</td></tr>
+                    <tr><td colSpan={11}>Nenhuma ferramenta.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -358,13 +448,15 @@ export default function App() {
         <section className="form" aria-label="estoque">
           <h2>Gestão de Estoque</h2>
 
-          {/* listagem alfabética (7.1.1) */}
+          {/* listagem alfabética */}
           <div style={{ width: "100%" }}>
-            <h3>Produtos (ordem alfabética)</h3>
+            <h3>Ferramentas (ordem alfabética)</h3>
             <ul style={{ listStyle: "none", paddingLeft: 0 }}>
               {produtosOrdenados.map((p) => (
                 <li key={p.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <span style={{ width: "50%" }}>{p.nome}</span>
+                  <span style={{ width: "30%" }}>{p.nome}</span>
+                  <span>Marca: <b>{p.marca}</b></span>
+                  <span>Modelo: <b>{p.modelo}</b></span>
                   <span>Qtd: <b>{p.quantidade}</b></span>
                   <span>Mín: <b>{p.estoque_minimo}</b></span>
                   <span>{p.quantidade < p.estoque_minimo ? "⚠️ Baixo" : ""}</span>
@@ -373,11 +465,11 @@ export default function App() {
             </ul>
           </div>
 
-          {/* formulário de movimentação (7.1.2–7.1.3–7.1.4) */}
+          {/* formulário de movimentação */}
           <div style={{ width: "100%", marginTop: 10 }}>
             <h3>Registrar movimentação</h3>
             <div className="input-container">
-              <label>Produto</label>
+              <label>Ferramenta</label>
               <select
                 value={movProdutoId}
                 onChange={(e) => setMovProdutoId(e.target.value)}
@@ -385,7 +477,7 @@ export default function App() {
               >
                 <option value="">Selecione...</option>
                 {produtosOrdenados.map((p) => (
-                  <option key={p.id} value={p.id}>{p.nome}</option>
+                  <option key={p.id} value={p.id}>{p.nome} ({p.marca} - {p.modelo})</option>
                 ))}
               </select>
             </div>
@@ -424,7 +516,7 @@ export default function App() {
                 type="text"
                 value={movObs}
                 onChange={(e) => setMovObs(e.target.value)}
-                placeholder="Ex.: retirada para feira"
+                placeholder="Ex.: retirada para manutenção"
               />
             </div>
 

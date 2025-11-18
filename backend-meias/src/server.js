@@ -1,46 +1,54 @@
-// server.js — mini backend "meia meia meia" (Prova SAEP)
-// npm i express cors pg
+// ======================================================================
+// server.js — Backend COMPLETO baseado no briefing de Ferramentas
+// ======================================================================
+
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 
 const app = express();
 const pool = new Pool({
-  user: 'postgres',            // <-- ajuste aqui
-  password: 'senai',        // <-- ajuste aqui
+  user: 'postgres',
+  password: 'senai',
   host: 'localhost',
   port: 5432,
-  database: 'saep_db',         // banco exigido pela prova
+  database: 'saep_db',
 });
 
 app.use(cors());
 app.use(express.json());
 
-// util simples
+// utils
 const ok = (res, data) => res.json(data);
 const fail = (res, err, code = 500) => {
   console.error(err);
-  res.status(code).json({ error: typeof err === 'string' ? err : 'Erro interno' });
+  res.status(code).json({
+    error: typeof err === 'string' ? err : 'Erro interno no servidor',
+  });
 };
 
-// -----------------------------
+// ======================================================================
 // HEALTHCHECK
-// -----------------------------
+// ======================================================================
 app.get('/health', async (_req, res) => {
   try {
     await pool.query('SELECT 1');
     ok(res, { status: 'ok' });
-  } catch (e) { fail(res, e); }
+  } catch (e) {
+    fail(res, e);
+  }
 });
 
-// -----------------------------
-// USUÁRIOS (divulgadores)
-// -----------------------------
+// ======================================================================
+// USUÁRIOS
+// ======================================================================
 
-// cadastro de usuário (nome, email, senha)
+// cadastro
 app.post('/usuarios', async (req, res) => {
   const { nome, email, senha } = req.body || {};
-  if (!nome || !email || !senha) return fail(res, 'Campos obrigatórios: nome, email, senha', 400);
+  if (!nome || !email || !senha)
+    return fail(res, 'Campos obrigatórios: nome, email, senha', 400);
+
   try {
     const q = `
       INSERT INTO usuarios (nome, email, senha)
@@ -50,138 +58,258 @@ app.post('/usuarios', async (req, res) => {
     const r = await pool.query(q, [nome, email, senha]);
     ok(res, r.rows[0]);
   } catch (e) {
-    if (String(e?.message).includes('unique')) return fail(res, 'E-mail já cadastrado', 409);
+    if (String(e?.message).includes('unique'))
+      return fail(res, 'E-mail já cadastrado', 409);
+
     fail(res, e);
   }
 });
 
-// login simples (sem sessão/JWT — retorna o usuário se credenciais ok)
+// login
 app.post('/auth/login', async (req, res) => {
   const { email, senha } = req.body || {};
   if (!email || !senha) return fail(res, 'Informe email e senha', 400);
+
   try {
     const r = await pool.query(
       'SELECT id, nome, email FROM usuarios WHERE email=$1 AND senha=$2',
       [email, senha]
     );
     if (r.rows.length === 0) return fail(res, 'Credenciais inválidas', 401);
+
     ok(res, r.rows[0]);
-  } catch (e) { fail(res, e); }
+  } catch (e) {
+    fail(res, e);
+  }
 });
 
-// -----------------------------
-// PRODUTOS (modelos de meias)
-// -----------------------------
+// ======================================================================
+// PRODUTOS (Ferramentas com características específicas)
+// ======================================================================
 
-// listar produtos (ordem alfabética, busca opcional ?q=)
+// LISTAR PRODUTOS
 app.get('/produtos', async (req, res) => {
   const q = (req.query.q || '').trim();
   const hasQ = q.length > 0;
-  const sql =
-    `SELECT id, nome, quantidade, estoque_minimo,
-            (quantidade < estoque_minimo) AS abaixo_do_minimo
-       FROM produtos
-      ${hasQ ? 'WHERE lower(nome) LIKE lower($1)' : ''}
-      ORDER BY nome ASC`;
+
+  const sql = `
+    SELECT id, nome, marca, modelo, tipo_material, tamanho, peso,
+           tensao_eletrica, quantidade, estoque_minimo,
+           (quantidade < estoque_minimo) AS abaixo_do_minimo
+      FROM produtos
+      ${hasQ ? 'WHERE LOWER(nome) LIKE LOWER($1)' : ''}
+     ORDER BY nome ASC
+  `;
+
   try {
-    const args = hasQ ? [`%${q}%`] : [];
-    const r = await pool.query(sql, args);
+    const r = await pool.query(sql, hasQ ? [`%${q}%`] : []);
     ok(res, r.rows);
-  } catch (e) { fail(res, e); }
+  } catch (e) {
+    fail(res, e);
+  }
 });
 
-// obter 1 produto
+// PEGAR UM PRODUTO
 app.get('/produtos/:id', async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT id, nome, quantidade, estoque_minimo,
-              (quantidade < estoque_minimo) AS abaixo_do_minimo
-         FROM produtos WHERE id=$1`,
+      `
+      SELECT id, nome, marca, modelo, tipo_material, tamanho, peso,
+             tensao_eletrica, quantidade, estoque_minimo,
+             (quantidade < estoque_minimo) AS abaixo_do_minimo
+        FROM produtos
+       WHERE id=$1
+     `,
       [req.params.id]
     );
+
     if (!r.rows.length) return fail(res, 'Produto não encontrado', 404);
+
     ok(res, r.rows[0]);
-  } catch (e) { fail(res, e); }
+  } catch (e) {
+    fail(res, e);
+  }
 });
 
-// criar produto
+// CRIAR PRODUTO
 app.post('/produtos', async (req, res) => {
-  const { nome, quantidade = 0, estoque_minimo = 0 } = req.body || {};
-  if (!nome) return fail(res, 'Campo obrigatório: nome', 400);
+  const {
+    nome,
+    marca,
+    modelo,
+    tipo_material,
+    tamanho,
+    peso,
+    tensao_eletrica,
+    quantidade = 0,
+    estoque_minimo = 0,
+  } = req.body || {};
+
+  if (!nome || !marca || !modelo)
+    return fail(res, 'Campos obrigatórios: nome, marca, modelo', 400);
+
   try {
     const r = await pool.query(
-      `INSERT INTO produtos (nome, quantidade, estoque_minimo)
-       VALUES ($1,$2,$3)
-       RETURNING id, nome, quantidade, estoque_minimo`,
-      [nome, Number(quantidade) || 0, Number(estoque_minimo) || 0]
+      `
+      INSERT INTO produtos
+        (nome, marca, modelo, tipo_material, tamanho, peso, tensao_eletrica,
+         quantidade, estoque_minimo)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      RETURNING id, nome, marca, modelo, tipo_material, tamanho, peso,
+                tensao_eletrica, quantidade, estoque_minimo
+      `,
+      [
+        nome,
+        marca,
+        modelo,
+        tipo_material || null,
+        tamanho || null,
+        peso || null,
+        tensao_eletrica || null,
+        Number(quantidade) || 0,
+        Number(estoque_minimo) || 0,
+      ]
     );
+
     ok(res, r.rows[0]);
-  } catch (e) { fail(res, e); }
+  } catch (e) {
+    fail(res, e);
+  }
 });
 
-// atualizar produto
+// ATUALIZAR PRODUTO
 app.put('/produtos/:id', async (req, res) => {
-  const { nome, quantidade, estoque_minimo } = req.body || {};
+  const {
+    nome,
+    marca,
+    modelo,
+    tipo_material,
+    tamanho,
+    peso,
+    tensao_eletrica,
+    quantidade,
+    estoque_minimo,
+  } = req.body || {};
+
   try {
     const r = await pool.query(
-      `UPDATE produtos
-          SET nome = COALESCE($1, nome),
-              quantidade = COALESCE($2, quantidade),
-              estoque_minimo = COALESCE($3, estoque_minimo)
-        WHERE id=$4
-      RETURNING id, nome, quantidade, estoque_minimo`,
-      [nome ?? null, quantidade ?? null, estoque_minimo ?? null, req.params.id]
+      `
+      UPDATE produtos
+         SET nome = COALESCE($1, nome),
+             marca = COALESCE($2, marca),
+             modelo = COALESCE($3, modelo),
+             tipo_material = COALESCE($4, tipo_material),
+             tamanho = COALESCE($5, tamanho),
+             peso = COALESCE($6, peso),
+             tensao_eletrica = COALESCE($7, tensao_eletrica),
+             quantidade = COALESCE($8, quantidade),
+             estoque_minimo = COALESCE($9, estoque_minimo)
+       WHERE id=$10
+     RETURNING *
+      `,
+      [
+        nome ?? null,
+        marca ?? null,
+        modelo ?? null,
+        tipo_material ?? null,
+        tamanho ?? null,
+        peso ?? null,
+        tensao_eletrica ?? null,
+        quantidade ?? null,
+        estoque_minimo ?? null,
+        req.params.id,
+      ]
     );
+
     if (!r.rows.length) return fail(res, 'Produto não encontrado', 404);
+
     ok(res, r.rows[0]);
-  } catch (e) { fail(res, e); }
+  } catch (e) {
+    fail(res, e);
+  }
 });
 
-// deletar produto
+// DELETAR PRODUTO
 app.delete('/produtos/:id', async (req, res) => {
   try {
-    const r = await pool.query('DELETE FROM produtos WHERE id=$1 RETURNING id', [req.params.id]);
+    const r = await pool.query('DELETE FROM produtos WHERE id=$1 RETURNING id', [
+      req.params.id,
+    ]);
+
     if (!r.rows.length) return fail(res, 'Produto não encontrado', 404);
-    ok(res, { message: 'Produto excluído' });
-  } catch (e) { fail(res, e); }
+
+    ok(res, { message: 'Produto deletado com sucesso' });
+  } catch (e) {
+    fail(res, e);
+  }
 });
 
-// -----------------------------
-// MOVIMENTAÇÕES (entrada/saída)
-// -----------------------------
+// ======================================================================
+// MOVIMENTAÇÕES (Entrada e Saída)
+// ======================================================================
 
-// criar movimentação + atualizar saldo do produto (transação simples)
+// CRIAR MOVIMENTAÇÃO
 app.post('/movimentacoes', async (req, res) => {
-  const { produto_id, usuario_id, tipo, quantidade, data_movimentacao, observacao } = req.body || {};
+  const {
+    produto_id,
+    usuario_id,
+    tipo,
+    quantidade,
+    data_movimentacao,
+    observacao,
+  } = req.body || {};
+
   if (!produto_id || !usuario_id || !tipo || !quantidade)
-    return fail(res, 'Campos obrigatórios: produto_id, usuario_id, tipo, quantidade', 400);
+    return fail(
+      res,
+      'Campos obrigatórios: produto_id, usuario_id, tipo, quantidade',
+      400
+    );
 
   if (!['entrada', 'saida'].includes(String(tipo).toLowerCase()))
     return fail(res, "tipo deve ser 'entrada' ou 'saida'", 400);
 
-  const delta = String(tipo).toLowerCase() === 'entrada' ? +Math.abs(quantidade) : -Math.abs(quantidade);
+  const delta =
+    String(tipo).toLowerCase() === 'entrada'
+      ? +Math.abs(quantidade)
+      : -Math.abs(quantidade);
 
   const client = await pool.connect();
+
   try {
     await client.query('BEGIN');
 
-    // atualiza saldo
     const up = await client.query(
-      'UPDATE produtos SET quantidade = quantidade + $1 WHERE id=$2 RETURNING id, nome, quantidade, estoque_minimo',
+      `
+      UPDATE produtos
+         SET quantidade = quantidade + $1
+       WHERE id=$2
+    RETURNING *
+      `,
       [delta, produto_id]
     );
+
     if (!up.rows.length) {
       await client.query('ROLLBACK');
       client.release();
       return fail(res, 'Produto não encontrado', 404);
     }
 
-    // registra movimento
     const ins = await client.query(
-      `INSERT INTO movimentacoes (produto_id, usuario_id, tipo, quantidade, data_movimentacao, observacao)
-       VALUES ($1,$2,$3,$4,COALESCE($5, NOW()),$6)
-       RETURNING id, produto_id, usuario_id, tipo, quantidade, data_movimentacao, observacao`,
-      [produto_id, usuario_id, String(tipo).toLowerCase(), Math.abs(quantidade), data_movimentacao || null, observacao || null]
+      `
+      INSERT INTO movimentacoes
+        (produto_id, usuario_id, tipo, quantidade, data_movimentacao, observacao)
+      VALUES ($1,$2,$3,$4,COALESCE($5, NOW()),$6)
+      RETURNING *
+      `,
+      [
+        produto_id,
+        usuario_id,
+        String(tipo).toLowerCase(),
+        Math.abs(quantidade),
+        data_movimentacao || null,
+        observacao || null,
+      ]
     );
 
     await client.query('COMMIT');
@@ -195,34 +323,43 @@ app.post('/movimentacoes', async (req, res) => {
       },
     });
   } catch (e) {
-    try { await client.query('ROLLBACK'); } catch (_) {}
+    try {
+      await client.query('ROLLBACK');
+    } catch (_) {}
     client.release();
     fail(res, e);
   }
 });
 
-// histórico geral ou filtrado por produto (?produto_id=)
+// HISTÓRICO
 app.get('/movimentacoes', async (req, res) => {
   const { produto_id } = req.query;
-  const hasFilter = !!produto_id;
+  const has = !!produto_id;
+
   const sql = `
-    SELECT m.id, m.produto_id, p.nome AS produto_nome,
-           m.usuario_id, u.nome AS responsavel_nome,
-           m.tipo, m.quantidade, m.data_movimentacao, m.observacao
+    SELECT m.*, 
+           p.nome AS produto_nome,
+           u.nome AS responsavel_nome
       FROM movimentacoes m
       JOIN produtos p ON p.id = m.produto_id
       JOIN usuarios u ON u.id = m.usuario_id
-     ${hasFilter ? 'WHERE m.produto_id = $1' : ''}
-     ORDER BY m.data_movimentacao DESC, m.id DESC
+     ${has ? 'WHERE m.produto_id = $1' : ''}
+     ORDER BY m.data_movimentacao DESC
   `;
+
   try {
-    const r = await pool.query(sql, hasFilter ? [produto_id] : []);
+    const r = await pool.query(sql, has ? [produto_id] : []);
     ok(res, r.rows);
-  } catch (e) { fail(res, e); }
+  } catch (e) {
+    fail(res, e);
+  }
 });
 
-// -----------------------------
+// ======================================================================
 // START
-// -----------------------------
+// ======================================================================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+app.listen(PORT, () =>
+  console.log(`Servidor rodando corretamente na porta ${PORT}`)
+);
+

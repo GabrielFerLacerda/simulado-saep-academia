@@ -1,52 +1,5 @@
-✅ REQUISITOS NÃO FUNCIONAIS (RNF)
-
-Regras sobre qualidade, desempenho e arquitetura do sistema.
-
-RNF01 — Banco de Dados
-- O sistema deve utilizar PostgreSQL como banco de dados principal.
-
-RNF02 — Conexão Segura com o Banco
-- A conexão ao banco deve ser feita utilizando variáveis de ambiente (.env) para proteger credenciais.
-
-RNF03 — API em Node.js
-- O backend deve ser desenvolvido em:
-- Node.js
-- Express
-- pg (PostgreSQL)
-
-RNF04 — Respostas em JSON
-- Todas as rotas devem responder exclusivamente em formato JSON.
-
-RNF05 — Tratamento de Erros
-- O backend deve validar entradas e retornar:
-- 400 para requisições inválidas
-- 404 para item não encontrado
-- 500 para erro de servidor
-
-RNF06 — Performance
-- O sistema deve responder requisições em menos de 2 segundos, mesmo com grande volume de produtos.
-- RNF07 — Interface Responsiva
-- O frontend React deve se adaptar a diferentes resoluções (desktop, tablet, celular).
-
-RNF08 — Persistência dos Dados
-- Todas as informações cadastradas devem ser salvas no banco de dados e persistir após reinícios do servidor.
-
-RNF09 — Organização do Código
-- O projeto deve ser estruturado separando:
-- Rotas
-- Controladores
-- Acesso ao banco
-- Componentes React
-
-RNF10 — CORS
-- O backend deve permitir acesso apenas do frontend autorizado, evitando acessos indevidos.
-
-RNF11 — Padrão REST
-- A API deve seguir estritamente os padrões RESTful.
 
 
-
----
 
 # 🧦 Frontend - Sistema de Estoque “meia meia meia” (React + Axios)
 

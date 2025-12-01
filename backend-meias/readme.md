@@ -87,3 +87,77 @@
   4. Informar quantidade
   5. Clicar em "Registrar"
 - **Resultado esperado:** Quantidade da ferramenta é reduzida corretamente
+
+### Script  - Estrutura do banco de dados
+
+-- ============================================================
+-- 1) CRIAÇÃO DO BANCO 
+-- ============================================================
+
+-- CREATE DATABASE saep_db;
+-- \c saep_db;
+
+-- ============================================================
+-- 2) TABELA: usuarios
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS usuarios (
+  id SERIAL PRIMARY KEY,
+  nome VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  senha VARCHAR(255) NOT NULL
+);
+
+-- ============================================================
+-- 3) TABELA: produtos (Ferramentas e Equipamentos Manuais)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS produtos (
+  id SERIAL PRIMARY KEY,
+
+  -- Identificação
+  nome VARCHAR(255) NOT NULL,
+  marca VARCHAR(255) NOT NULL,
+  modelo VARCHAR(255) NOT NULL,
+
+  -- Características específicas
+  tipo_material VARCHAR(255),
+  tamanho VARCHAR(100),        -- Pode armazenar medidas flexíveis (ex: "30 cm", "12mm")
+  peso VARCHAR(50),            -- Peso pode ter diferentes formatos (ex: "2kg", "350g")
+  tensao_eletrica VARCHAR(50), -- Ex: 110V / 220V / Bivolt
+
+  -- Controle de estoque
+  quantidade INTEGER DEFAULT 0,
+  estoque_minimo INTEGER DEFAULT 0
+);
+
+-- ============================================================
+-- 4) TABELA: movimentacoes (histórico de entrada/saída)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS movimentacoes (
+  id SERIAL PRIMARY KEY,
+
+  produto_id INTEGER NOT NULL REFERENCES produtos(id) ON DELETE CASCADE,
+  usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+
+  tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('entrada', 'saida')),
+  quantidade INTEGER NOT NULL CHECK (quantidade > 0),
+
+  data_movimentacao TIMESTAMP NOT NULL DEFAULT NOW(),
+  observacao TEXT
+);
+
+-- ============================================================
+-- 5) ÍNDICES IMPORTANTES
+-- ============================================================
+
+CREATE INDEX IF NOT EXISTS idx_produtos_nome
+  ON produtos (LOWER(nome));
+
+CREATE INDEX IF NOT EXISTS idx_movimentacoes_produto
+  ON movimentacoes (produto_id);
+
+CREATE INDEX IF NOT EXISTS idx_movimentacoes_data
+  ON movimentacoes (data_movimentacao DESC);
+
